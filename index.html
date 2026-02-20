@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>NEON HOVER-PONG | Cyberpunk Arcade</title>
+    <style>
+      /* ================= 工业级 CSS 样式 ================= */
+      :root {
+        --bg-color: #050508;
+        --p1-color: #00f3ff; /* Cyber Cyan */
+        --p2-color: #ff00ff; /* Neon Magenta */
+        --ui-font: "Courier New", Courier, monospace;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      body,
+      html {
+        width: 100%;
+        height: 100%;
+        background-color: var(--bg-color);
+        overflow: hidden;
+        font-family: var(--ui-font);
+        color: #fff;
+        touch-action: none; /* 彻底禁止浏览器默认手势 */
+      }
+
+      #game-stage {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at center, #111424 0%, #020205 100%);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      /* 高级 CRT 滤镜与暗角 (Vignette) */
+      .crt-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background:
+          linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+          linear-gradient(
+            90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06)
+          ),
+          radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.6) 120%);
+        background-size:
+          100% 3px,
+          3px 100%,
+          100% 100%;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #ui-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 20;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .score-board {
+        position: absolute;
+        top: 5%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 20vw;
+        font-size: 12vh;
+        font-weight: bold;
+        opacity: 0.85;
+        mix-blend-mode: screen;
+      }
+      #score-a {
+        color: var(--p1-color);
+        text-shadow:
+          0 0 20px var(--p1-color),
+          0 0 40px var(--p1-color);
+      }
+      #score-b {
+        color: var(--p2-color);
+        text-shadow:
+          0 0 20px var(--p2-color),
+          0 0 40px var(--p2-color);
+      }
+
+      /* 状态与倒计时文本 */
+      #center-msg {
+        font-size: 5vh;
+        color: #fff;
+        text-shadow:
+          0 0 15px #fff,
+          0 0 30px #fff;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        font-weight: bold;
+        transition: all 0.1s;
+        pointer-events: auto;
+        cursor: pointer;
+        text-align: center;
+      }
+      .btn-start {
+        background: rgba(0, 243, 255, 0.1);
+        border: 1px solid var(--p1-color);
+        padding: 15px 30px;
+        box-shadow: 0 0 15px rgba(0, 243, 255, 0.4) inset;
+      }
+      .btn-start:active {
+        transform: scale(0.95);
+        background: rgba(0, 243, 255, 0.3);
+      }
+      .blink {
+        animation: blinkAnim 1.5s infinite;
+      }
+      @keyframes blinkAnim {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .anim-pop {
+        animation: popAnim 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      @keyframes popAnim {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      #touch-zones {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        display: flex;
+      }
+      .zone {
+        flex: 1;
+      }
+
+      .controls-hint {
+        position: absolute;
+        bottom: 20px;
+        width: 100%;
+        text-align: center;
+        font-size: 1.5vh;
+        opacity: 0.3;
+        pointer-events: none;
+        letter-spacing: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-stage">
+      <canvas id="game-canvas"></canvas>
+      <div class="crt-overlay"></div>
+
+      <div id="touch-zones">
+        <div class="zone" id="zone-a"></div>
+        <div class="zone" id="zone-b"></div>
+      </div>
+
+      <div id="ui-layer">
+        <div class="score-board">
+          <div id="score-a">0</div>
+          <div id="score-b">0</div>
+        </div>
+        <div id="center-msg" class="btn-start blink">
+          SYSTEM READY<br /><span style="font-size: 2vh; font-weight: normal"
+            >TAP TO INITIATE</span
+          >
+        </div>
+        <div class="controls-hint">
+          P1 (CYAN): DRAG / W S &nbsp;&nbsp;|&nbsp;&nbsp; P2 (MAGENTA): DRAG /
+          UP DOWN
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ================= 核心配置与状态 =================
+      const CONFIG = {
+        paddleHeight: 0.2,
+        paddleWidth: 0.012,
+        ballSize: 0.012,
+        speedBase: 0.007,
+        speedMax: 0.025,
+        speedInc: 0.0006,
+        friction: 0.95,
+        winScore: 7,
+        colors: { p1: "#00f3ff", p2: "#ff00ff", ball: "#ffffff" },
+      };
+
+      const STATE = { IDLE: 0, READY: 1, PLAYING: 2, SCORED: 3, GAMEOVER: 4 };
+      let currentState = STATE.IDLE;
+      let score = { a: 0, b: 0 };
+      let shake = 0;
+
+      // 实体对象 (增加 hitFlash 用于白光打击反馈)
+      const p1 = { y: 0.5, h: 0, w: 0, color: CONFIG.colors.p1, hitFlash: 0 };
+      const p2 = { y: 0.5, h: 0, w: 0, color: CONFIG.colors.p2, hitFlash: 0 };
+      const ball = { x: 0.5, y: 0.5, vx: 0, vy: 0, r: 0, trail: [] };
+      let particles = [];
+      let gridOffset = 0; // 用于动态网格
+
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      let width, height;
+
+      function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        p1.h = p2.h = height * CONFIG.paddleHeight;
+        p1.w = p2.w = width * CONFIG.paddleWidth;
+        ball.r = width * CONFIG.ballSize;
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // ================= 音效合成器 & 震动 =================
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let actx, humNode;
+
+      function initAudio() {
+        if (actx && actx.state === "running") return;
+        if (!actx) actx = new AudioCtx();
+        actx.resume();
+
+        if (!humNode) {
+          humNode = actx.createOscillator();
+          const gain = actx.createGain();
+          humNode.type = "sawtooth";
+          humNode.frequency.value = 45;
+          gain.gain.value = 0.015;
+          const filter = actx.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.value = 100;
+          humNode.connect(filter);
+          filter.connect(gain);
+          gain.connect(actx.destination);
+          humNode.start();
+        }
+      }
+
+      const SFX = {
+        play: (type, freq, time, vol = 0.1, drop = false) => {
+          if (!actx) return;
+          const osc = actx.createOscillator();
+          const gain = actx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, actx.currentTime);
+          if (drop)
+            osc.frequency.exponentialRampToValueAtTime(
+              freq / 4,
+              actx.currentTime + time,
+            );
+          else
+            osc.frequency.exponentialRampToValueAtTime(
+              freq * 1.5,
+              actx.currentTime + time,
+            );
+          gain.gain.setValueAtTime(vol, actx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            actx.currentTime + time,
+          );
+          osc.connect(gain);
+          gain.connect(actx.destination);
+          osc.start();
+          osc.stop(actx.currentTime + time);
+        },
+        hitP1: () => SFX.play("square", 300, 0.1, 0.1),
+        hitP2: () => SFX.play("square", 500, 0.1, 0.1),
+        wall: () => SFX.play("triangle", 150, 0.1, 0.1),
+        score: () => SFX.play("sine", 800, 0.6, 0.2, true),
+        beep: (high) => SFX.play("sine", high ? 880 : 440, 0.1, 0.1),
+      };
+
+      function haptic(type) {
+        if (!navigator.vibrate) return;
+        if (type === "hit") navigator.vibrate(30);
+        if (type === "score") navigator.vibrate([80, 50, 80]);
+      }
+
+      // ================= 渲染系统 =================
+      class Particle {
+        constructor(x, y, color, explode = false) {
+          this.x = x;
+          this.y = y;
+          this.color = color;
+          const angle = Math.random() * Math.PI * 2;
+          const speed = explode
+            ? Math.random() * 15 + 5
+            : Math.random() * 6 + 2;
+          this.vx = Math.cos(angle) * speed;
+          this.vy = Math.sin(angle) * speed;
+          this.life = 1.0;
+          this.decay = Math.random() * 0.04 + 0.015;
+        }
+        update() {
+          this.x += this.vx;
+          this.y += this.vy;
+          this.vx *= CONFIG.friction;
+          this.vy *= CONFIG.friction;
+          this.life -= this.decay;
+        }
+        draw(ctx) {
+          ctx.fillStyle = this.color;
+          ctx.globalAlpha = this.life;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        }
+      }
+      function spawnParticles(x, y, color, count = 15, explode = false) {
+        for (let i = 0; i < count; i++)
+          particles.push(new Particle(x, y, color, explode));
+      }
+
+      // 绘制赛博朋克 3D 纵深网格
+      function drawSynthGrid() {
+        ctx.strokeStyle = "rgba(0, 243, 255, 0.05)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+
+        // 放射状纵线 (透视感)
+        const centerX = width / 2;
+        const vanishY = height * 0.5; // 消失点在正中
+        for (let i = -10; i <= 10; i++) {
+          let bottomX = centerX + i * (width * 0.15);
+          ctx.moveTo(centerX, vanishY);
+          ctx.lineTo(bottomX, height);
+          ctx.moveTo(centerX, vanishY);
+          ctx.lineTo(bottomX, 0);
+        }
+
+        // 滚动的横线
+        const lines = 8;
+        gridOffset =
+          (gridOffset + (Math.abs(ball.vx) * 300 + 0.5)) % (height / lines);
+        for (let i = 0; i < lines; i++) {
+          let y = vanishY + Math.pow(i / lines, 2) * (height / 2);
+          y += gridOffset * (i / lines); // 越靠边缘动得越快，形成 3D 错觉
+          if (y < height) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+          }
+
+          let yTop = vanishY - Math.pow(i / lines, 2) * (height / 2);
+          yTop -= gridOffset * (i / lines);
+          if (yTop > 0) {
+            ctx.moveTo(0, yTop);
+            ctx.lineTo(width, yTop);
+          }
+        }
+        ctx.stroke();
+
+        // 中场线与发光圆
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 15]);
+        ctx.beginPath();
+        ctx.moveTo(width / 2, 0);
+        ctx.lineTo(width / 2, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(width / 2, height / 2, height * 0.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      function hexToRgb(hex) {
+        let bigint = parseInt(hex.replace("#", ""), 16);
+        return `${(bigint >> 16) & 255}, ${(bigint >> 8) & 255}, ${bigint & 255}`;
+      }
+
+      // ================= 核心逻辑 =================
+      function update() {
+        if (shake > 0) shake *= 0.85;
+        if (shake < 0.5) shake = 0;
+
+        // 拍子高光衰减
+        if (p1.hitFlash > 0) p1.hitFlash = Math.max(0, p1.hitFlash - 0.05);
+        if (p2.hitFlash > 0) p2.hitFlash = Math.max(0, p2.hitFlash - 0.05);
+
+        // 粒子更新
+        for (let i = particles.length - 1; i >= 0; i--) {
+          particles[i].update();
+          if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+
+        if (currentState !== STATE.PLAYING) return;
+
+        let pixelX = ball.x * width + ball.vx * width;
+        let pixelY = ball.y * height + ball.vy * height;
+
+        // 上下墙壁碰撞
+        if (pixelY < ball.r) {
+          pixelY = ball.r;
+          ball.vy *= -1;
+          SFX.wall();
+          shake = 4;
+        } else if (pixelY > height - ball.r) {
+          pixelY = height - ball.r;
+          ball.vy *= -1;
+          SFX.wall();
+          shake = 4;
+        }
+
+        // 拍子碰撞检测
+        let p1x = width * 0.05;
+        if (
+          ball.vx < 0 &&
+          pixelX - ball.r < p1x + p1.w / 2 &&
+          pixelX - ball.r > p1x - p1.w
+        ) {
+          let pTop = p1.y * height - p1.h / 2,
+            pBot = p1.y * height + p1.h / 2;
+          if (pixelY > pTop && pixelY < pBot) {
+            ball.vx *= -1;
+            ball.vx += CONFIG.speedInc;
+            ball.vy = ((pixelY - p1.y * height) / (p1.h / 2)) * 0.018; // 加强切球效果
+            pixelX = p1x + p1.w / 2 + ball.r + 1;
+            p1.hitFlash = 1.0;
+            shake = 8;
+            spawnParticles(pixelX, pixelY, CONFIG.colors.p1, 20);
+            SFX.hitP1();
+            haptic("hit");
+          }
+        }
+
+        let p2x = width * 0.95;
+        if (
+          ball.vx > 0 &&
+          pixelX + ball.r > p2x - p2.w / 2 &&
+          pixelX + ball.r < p2x + p2.w
+        ) {
+          let pTop = p2.y * height - p2.h / 2,
+            pBot = p2.y * height + p2.h / 2;
+          if (pixelY > pTop && pixelY < pBot) {
+            ball.vx *= -1;
+            ball.vx -= CONFIG.speedInc;
+            ball.vy = ((pixelY - p2.y * height) / (p2.h / 2)) * 0.018;
+            pixelX = p2x - p2.w / 2 - ball.r - 1;
+            p2.hitFlash = 1.0;
+            shake = 8;
+            spawnParticles(pixelX, pixelY, CONFIG.colors.p2, 20);
+            SFX.hitP2();
+            haptic("hit");
+          }
+        }
+
+        // ========== 胜负判定与阻断（修复核心！） ==========
+        if (pixelX < 0) {
+          handleScore("b");
+          return;
+        }
+        if (pixelX > width) {
+          handleScore("a");
+          return;
+        }
+
+        ball.x = pixelX / width;
+        ball.y = pixelY / height;
+
+        ball.trail.push({ x: pixelX, y: pixelY });
+        if (ball.trail.length > 20) ball.trail.shift();
+      }
+
+      function handleScore(winner) {
+        currentState = STATE.SCORED; // 立即切换状态，阻止下一帧 update
+        score[winner]++;
+        document.getElementById(`score-${winner}`).innerText = score[winner];
+
+        // 爆炸粒子特效
+        spawnParticles(
+          winner === "a" ? width : 0,
+          ball.y * height,
+          winner === "a" ? CONFIG.colors.p1 : CONFIG.colors.p2,
+          60,
+          true,
+        );
+        shake = 35;
+        SFX.score();
+        haptic("score");
+
+        const uiMsg = document.getElementById("center-msg");
+
+        if (score[winner] >= CONFIG.winScore) {
+          currentState = STATE.GAMEOVER;
+          uiMsg.innerHTML = `${winner === "a" ? "CYAN" : "MAGENTA"} WINS THE DUEL!<br><span style="font-size:2vh">TAP TO RESTART</span>`;
+          uiMsg.className = "btn-start blink anim-pop";
+          uiMsg.style.pointerEvents = "auto";
+        } else {
+          setTimeout(() => startCountdown(winner === "a" ? "b" : "a"), 1500); // 赢家得分，下一局输家发球
+        }
+      }
+
+      function startCountdown(serveSide) {
+        currentState = STATE.READY;
+        ball.trail = [];
+        ball.x = 0.5;
+        ball.y = 0.5;
+        const uiMsg = document.getElementById("center-msg");
+        uiMsg.style.pointerEvents = "none";
+        uiMsg.className = "anim-pop";
+
+        let count = 3;
+        uiMsg.innerText = count;
+        SFX.beep(false);
+
+        let interval = setInterval(() => {
+          count--;
+          if (count > 0) {
+            uiMsg.innerText = count;
+            uiMsg.classList.remove("anim-pop");
+            void uiMsg.offsetWidth;
+            uiMsg.classList.add("anim-pop");
+            SFX.beep(false);
+          } else if (count === 0) {
+            uiMsg.innerText = "FIRE!";
+            uiMsg.classList.remove("anim-pop");
+            void uiMsg.offsetWidth;
+            uiMsg.classList.add("anim-pop");
+            SFX.beep(true);
+          } else {
+            clearInterval(interval);
+            uiMsg.innerText = "";
+
+            // 发球逻辑
+            currentState = STATE.PLAYING;
+            ball.vx = (serveSide === "a" ? 1 : -1) * CONFIG.speedBase;
+            ball.vy = (Math.random() - 0.5) * 0.015;
+          }
+        }, 800);
+      }
+
+      function draw() {
+        let dx = (Math.random() - 0.5) * shake;
+        let dy = (Math.random() - 0.5) * shake;
+        ctx.setTransform(1, 0, 0, 1, dx, dy);
+
+        // 清屏与底层
+        ctx.fillStyle = varBgColor = "#050508";
+        ctx.fillRect(-shake, -shake, width + shake * 2, height + shake * 2);
+
+        drawSynthGrid();
+
+        // 绘制拍子 (带有击中白光反馈)
+        function drawPaddle(p, xCenter) {
+          let pX = xCenter - p.w / 2,
+            pY = p.y * height - p.h / 2;
+          ctx.shadowBlur = 25 + p.hitFlash * 20;
+          ctx.shadowColor = p.color;
+          // 混合原始颜色与纯白
+          if (p.hitFlash > 0) {
+            ctx.fillStyle = `rgba(255,255,255, ${0.5 + p.hitFlash * 0.5})`;
+          } else {
+            ctx.fillStyle = p.color;
+          }
+          ctx.fillRect(pX, pY, p.w, p.h);
+
+          // 内发光核心线
+          ctx.fillStyle = "#fff";
+          ctx.shadowBlur = 0;
+          ctx.fillRect(pX + p.w * 0.3, pY + p.h * 0.1, p.w * 0.4, p.h * 0.8);
+        }
+        drawPaddle(p1, width * 0.05);
+        drawPaddle(p2, width * 0.95);
+
+        // 绘制球体与拖尾
+        if (currentState === STATE.PLAYING || currentState === STATE.READY) {
+          // 拖尾
+          ctx.globalCompositeOperation = "lighter";
+          for (let i = 0; i < ball.trail.length; i++) {
+            let t = ball.trail[i];
+            let opacity = Math.pow(i / ball.trail.length, 2) * 0.6; // 指数级淡入，尾巴更尖锐
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, ball.r * (i / ball.trail.length), 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 核心与色散 (Chromatic Aberration)
+          let speedX = ball.vx * width;
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = "#fff";
+          ctx.fillStyle = "rgba(255, 0, 50, 0.8)";
+          ctx.beginPath();
+          ctx.arc(
+            ball.x * width - speedX * 0.5,
+            ball.y * height,
+            ball.r,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
+          ctx.beginPath();
+          ctx.arc(
+            ball.x * width + speedX * 0.5,
+            ball.y * height,
+            ball.r,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.beginPath();
+          ctx.arc(
+            ball.x * width,
+            ball.y * height,
+            ball.r * 0.8,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          ctx.globalCompositeOperation = "source-over";
+        }
+
+        // 绘制粒子
+        ctx.shadowBlur = 10;
+        particles.forEach((p) => {
+          ctx.shadowColor = p.color;
+          p.draw(ctx);
+        });
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      // ================= 交互控制 =================
+      const touchZones = document.getElementById("touch-zones");
+      function handleInput(e) {
+        e.preventDefault();
+        if (currentState !== STATE.PLAYING && currentState !== STATE.READY)
+          return;
+
+        if (e.touches) {
+          for (let i = 0; i < e.touches.length; i++) {
+            let yPct = Math.max(
+              CONFIG.paddleHeight / 2,
+              Math.min(
+                1 - CONFIG.paddleHeight / 2,
+                e.touches[i].clientY / height,
+              ),
+            );
+            if (e.touches[i].clientX < width / 2) p1.y = yPct;
+            else p2.y = yPct;
+          }
+        } else {
+          let yPct = Math.max(
+            CONFIG.paddleHeight / 2,
+            Math.min(1 - CONFIG.paddleHeight / 2, e.clientY / height),
+          );
+          if (e.clientX < width / 2) p1.y = yPct;
+          else p2.y = yPct;
+        }
+      }
+      touchZones.addEventListener("touchstart", handleInput, {
+        passive: false,
+      });
+      touchZones.addEventListener("touchmove", handleInput, { passive: false });
+      window.addEventListener("mousemove", handleInput);
+
+      const keys = {};
+      window.addEventListener("keydown", (e) => (keys[e.key] = true));
+      window.addEventListener("keyup", (e) => (keys[e.key] = false));
+      function keyLoop() {
+        if (currentState === STATE.PLAYING || currentState === STATE.READY) {
+          const step = 0.025;
+          if ((keys["w"] || keys["W"]) && p1.y > CONFIG.paddleHeight / 2)
+            p1.y -= step;
+          if ((keys["s"] || keys["S"]) && p1.y < 1 - CONFIG.paddleHeight / 2)
+            p1.y += step;
+          if (keys["ArrowUp"] && p2.y > CONFIG.paddleHeight / 2) p2.y -= step;
+          if (keys["ArrowDown"] && p2.y < 1 - CONFIG.paddleHeight / 2)
+            p2.y += step;
+        }
+        requestAnimationFrame(keyLoop);
+      }
+      keyLoop();
+
+      // 启动按钮
+      document.getElementById("center-msg").addEventListener("click", (e) => {
+        initAudio();
+        if (currentState === STATE.IDLE || currentState === STATE.GAMEOVER) {
+          score = { a: 0, b: 0 };
+          document.getElementById("score-a").innerText = "0";
+          document.getElementById("score-b").innerText = "0";
+          startCountdown("a"); // A先发球
+        }
+      });
+
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
