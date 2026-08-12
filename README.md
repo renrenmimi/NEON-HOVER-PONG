@@ -1,1 +1,15 @@
-# NEON-HOVER-PONG
+# Neon Hover-Pong 🏓
+
+**▶ [Play now](https://renrenmimi.github.io/NEON-HOVER-PONG/)** — runs in your browser, nothing to install.
+
+Pong in a cyberpunk arcade. Your paddle follows wherever you hover — no clicking required.
+
+## Controls
+
+- **Mouse** — hover to move your paddle
+- **Keyboard** — `↑` / `↓`
+- **Touch** — drag on mobile
+
+## Tech
+
+Single-file HTML5 Canvas app. No build step, no dependencies.
