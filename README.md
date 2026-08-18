@@ -1,4 +1,4 @@
-# Neon Hover-Pong 🏓
+# Neon Hover-Pong
 
 **▶ [Play now](https://renrenmimi.github.io/NEON-HOVER-PONG/)** — runs in your browser, nothing to install.
 
