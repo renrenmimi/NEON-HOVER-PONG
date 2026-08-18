@@ -14,4 +14,4 @@ Pong in a cyberpunk arcade. Your paddle follows wherever you hover — no clicki
 
 ## Tech
 
-Single-file HTML5 Canvas app. No build step, no dependencies.
+One `index.html` file, Canvas 2D.
