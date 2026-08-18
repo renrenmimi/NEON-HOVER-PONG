@@ -4,6 +4,8 @@
 
 Pong in a cyberpunk arcade. Your paddle follows wherever you hover — no clicking required.
 
+![Cyberpunk Pong, steered by hovering](docs/screenshot.jpg)
+
 ## Controls
 
 - **Mouse** — hover to move your paddle
